@@ -1,13 +1,20 @@
+/*
+
+Functions which drive the bootstrapping and rendezvous for the peers, see for more info:
+https://github.com/libp2p/go-libp2p-examples/tree/master/chat-with-rendezvous
+
+*/
+
 package main
 
 import (
 	"bufio"
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"sync"
 
+	"github.com/rivo/tview"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -16,15 +23,12 @@ import (
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	multiaddr "github.com/multiformats/go-multiaddr"
-	logging "github.com/whyrusleeping/go-logging"
 
-	"github.com/ipfs/go-log"
 )
 
-var logger = log.Logger("rendezvous")
 
 func handleStream(stream network.Stream) {
-	logger.Info("Got a new stream!")
+	fmt.Println("Got a new stream!\n")
 
 	// Create a buffer stream for non blocking read and write.
 	rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
@@ -79,22 +83,16 @@ func writeData(rw *bufio.ReadWriter) {
 	}
 }
 
-func main() {
-	log.SetAllLoggers(logging.WARNING)
-	log.SetLogLevel("rendezvous", "info")
-	help := flag.Bool("h", false, "Display Help")
+// Function that bootstraps the network and connects to the desired peer
+func rendezvousChat(format *tview.TextView) {
+
 	config, err := ParseFlags()
 	if err != nil {
 		panic(err)
 	}
 
-	if *help {
-		fmt.Println("This program demonstrates a simple p2p chat application using libp2p")
-		fmt.Println()
-		fmt.Println("Usage: Run './chat in two different terminals. Let them connect to the bootstrap nodes, announce themselves and connect to the peers")
-		flag.PrintDefaults()
-		return
-	}
+	fmt.Fprintf(format, "Starting MonkSeal chat \n")
+
 
 	ctx := context.Background()
 
@@ -106,8 +104,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	logger.Info("Host created. We are:", host.ID())
-	logger.Info(host.Addrs())
+	fmt.Fprintf(format, "Host created. We are:", host.ID() + "\n")
+	//fmt.Fprintf(format, host.Addrs())
 
 	// Set a function as stream handler. This function is called when a peer
 	// initiates a connection and starts a stream with this peer.
@@ -124,7 +122,7 @@ func main() {
 
 	// Bootstrap the DHT. In the default configuration, this spawns a Background
 	// thread that will refresh the peer table every five minutes.
-	logger.Debug("Bootstrapping the DHT")
+	fmt.Fprintf(format, "Bootstrapping the DHT\n")
 	if err = kademliaDHT.Bootstrap(ctx); err != nil {
 		panic(err)
 	}
@@ -138,9 +136,10 @@ func main() {
 		go func() {
 			defer wg.Done()
 			if err := host.Connect(ctx, *peerinfo); err != nil {
-				logger.Warning(err)
+				//logger.Warning(err)
+				fmt.Fprintf(format, "Warning: ", err, "\n")
 			} else {
-				logger.Info("Connection established with bootstrap node:", *peerinfo)
+				fmt.Fprintf(format, "Connection established with bootstrap node:", *peerinfo, "\n")
 			}
 		}()
 	}
@@ -148,14 +147,14 @@ func main() {
 
 	// We use a rendezvous point "meet me here" to announce our location.
 	// This is like telling your friends to meet you at the Eiffel Tower.
-	logger.Info("Announcing ourselves...")
+	fmt.Fprintf(format, "Announcing ourselves...\n")
 	routingDiscovery := discovery.NewRoutingDiscovery(kademliaDHT)
 	discovery.Advertise(ctx, routingDiscovery, config.RendezvousString)
-	logger.Debug("Successfully announced!")
+	fmt.Fprintf(format, "Successfully announced!\n")
 
 	// Now, look for others who have announced
 	// This is like your friend telling you the location to meet you.
-	logger.Debug("Searching for other peers...")
+	fmt.Fprintf(format, "Searching for other peers...\n")
 	peerChan, err := routingDiscovery.FindPeers(ctx, config.RendezvousString)
 	if err != nil {
 		panic(err)
@@ -165,13 +164,13 @@ func main() {
 		if peer.ID == host.ID() {
 			continue
 		}
-		logger.Debug("Found peer:", peer)
+		fmt.Fprintf(format, "Found peer:", peer, "\n")
 
-		logger.Debug("Connecting to:", peer)
+		fmt.Fprintf(format, "Connecting to:", peer, "\n")
 		stream, err := host.NewStream(ctx, peer.ID, protocol.ID(config.ProtocolID))
 
 		if err != nil {
-			logger.Warning("Connection failed:", err)
+			fmt.Fprintf(format, "Connection failed:", err, "\n")
 			continue
 		} else {
 			rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
@@ -180,8 +179,10 @@ func main() {
 			go readData(rw)
 		}
 
-		logger.Info("Connected to:", peer)
+		fmt.Fprintf(format, "Connected to:", peer, "\n")
 	}
 
 	select {}
+
 }
+
