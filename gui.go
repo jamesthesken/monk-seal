@@ -22,6 +22,7 @@ func main() {
 			SetText(text)
 	}
 	
+	// Formatting for the rendezvous printouts
 	textView := tview.NewTextView().
 		SetTextColor(tcell.ColorYellow).
 		SetScrollable(true).
@@ -31,8 +32,17 @@ func main() {
 			app.Draw()
 		})
 
-	
-	go rendezvousChat(textView)
+	// goroutine to handle the p2p functions
+	//go rendezvousChat(textView)
+
+	// List
+	list := tview.NewList().
+		AddItem("Chat", "Some explanatory text", 'a', func() {
+			go rendezvousChat(textView)
+		}).
+		AddItem("Quit", "Press to exit", 'q', func() {
+			app.Stop()
+		})
 	
 	menu := newPrimitive("Menu")
 	//main := newPrimitive("Main content")
@@ -51,11 +61,11 @@ func main() {
 		AddItem(sideBar, 0, 0, 0, 0, 0, 0, false)
 
 	// Layout for screens wider than 100 cells.
-	grid.AddItem(menu, 1, 0, 1, 1, 0, 100, false).
+	grid.AddItem(list, 1, 0, 1, 1, 0, 100, false).
 		AddItem(textView, 1, 1, 1, 1, 0, 100, false).
 		AddItem(sideBar, 1, 2, 1, 1, 0, 100, false)
 
-	if err := app.SetRoot(grid, true).Run(); err != nil {
+	if err := app.SetRoot(grid, true).SetFocus(list).Run(); err != nil {
 		panic(err)
 	}
 }
