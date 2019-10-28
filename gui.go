@@ -9,63 +9,61 @@ package main
 import (
 	"github.com/rivo/tview"
 	"github.com/gdamore/tcell"
+	"strconv"
+	"fmt"
 )
 
+// Slide is a function which returns the slide's main primitive and its title.
+// It receives a "nextSlide" function which can be called to advance the
+// presentation to the next slide.
+type Slide func(nextSlide func()) (title string, content tview.Primitive)
+
+// Instantiate the app
+var app = tview.NewApplication()
+// Widget switching
+var pages = tview.NewPages() 
+
 func main() {
-	// Instantiate the app
-	 app := tview.NewApplication() 
-
-	// Aligns the text to the center of the grid section
-	newPrimitive := func(text string) tview.Primitive {
-		return tview.NewTextView().
-			SetTextAlign(tview.AlignCenter).
-			SetText(text)
+	
+	// The presentation slides.
+	slides := []Slide{
+		inputMessage,
+		selectChannel,
 	}
-	
-	// Formatting for the rendezvous printouts
-	textView := tview.NewTextView().
-		SetTextColor(tcell.ColorYellow).
-		SetScrollable(true).
+
+	// The bottom row has some info on where we are.
+	info := tview.NewTextView().
 		SetDynamicColors(true).
-		SetTextAlign(tview.AlignLeft).
-		SetChangedFunc(func() {
-			app.Draw()
-		})
+		SetRegions(true).
+		SetWrap(false)
 
-	// goroutine to handle the p2p functions
-	//go rendezvousChat(textView)
-
-	// List
-	list := tview.NewList().
-		AddItem("Chat", "Some explanatory text", 'a', func() {
-			go rendezvousChat(textView)
-		}).
-		AddItem("Quit", "Press to exit", 'q', func() {
-			app.Stop()
-		})
+	// Create the pages for all slides.
+	currentSlide := 0
+	info.Highlight(strconv.Itoa(currentSlide))
+	pages := tview.NewPages()
 	
-	menu := newPrimitive("Menu")
-	//main := newPrimitive("Main content")
-	sideBar := newPrimitive("Side Bar")
+	nextSlide := func() {
+		currentSlide = (currentSlide + 1) % len(slides)
+		info.Highlight(strconv.Itoa(currentSlide)).
+			ScrollToHighlight()
+		pages.SwitchToPage(strconv.Itoa(currentSlide))
+	}
+	for index, slide := range slides {
+		title, primitive := slide(nextSlide)
+		pages.AddPage(strconv.Itoa(index), primitive, true, index == currentSlide)
+		fmt.Fprintf(info, `%d ["%d"][darkcyan]%s[white][""]  `, index+1, index, title)
+	}
 
-	grid := tview.NewGrid().
-		SetRows(3, 0, 3).
-		SetColumns(30, 0, 30).
-		SetBorders(true).
-		AddItem(newPrimitive("Header"), 0, 0, 1, 3, 0, 0, false).
-		AddItem(newPrimitive("Footer"), 2, 0, 1, 3, 0, 0, false)
+	// Shortcuts to navigate 
+	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyTAB {
+			nextSlide()
+		} 
+		return event
+	})
 
-	// Layout for screens narrower than 100 cells (menu and side bar are hidden).
-	grid.AddItem(menu, 0, 0, 0, 0, 0, 0, false).
-		AddItem(textView, 1, 0, 1, 3, 0, 0, false).
-		AddItem(sideBar, 0, 0, 0, 0, 0, 0, false)
 
-	// Layout for screens wider than 100 cells.
-	grid.AddItem(list, 1, 0, 1, 1, 0, 100, false).
-		AddItem(textView, 1, 1, 1, 1, 0, 100, false).
-		AddItem(sideBar, 1, 2, 1, 1, 0, 100, false)
-
-	if err := app.SetRoot(grid, true).SetFocus(list).Run(); err != nil {
+	if err := app.SetRoot(pages, true).SetFocus(pages).Run(); err != nil {
 		panic(err)
 	}
 }
