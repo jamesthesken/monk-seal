@@ -9,61 +9,63 @@ package main
 import (
 	"github.com/rivo/tview"
 	"github.com/gdamore/tcell"
-	"strconv"
-	"fmt"
 )
-
-// Slide is a function which returns the slide's main primitive and its title.
-// It receives a "nextSlide" function which can be called to advance the
-// presentation to the next slide.
-type Slide func(nextSlide func()) (title string, content tview.Primitive)
 
 // Instantiate the app
 var app = tview.NewApplication()
-// Widget switching
-var pages = tview.NewPages() 
 
 func main() {
 	
-	// The presentation slides.
-	slides := []Slide{
-		inputMessage,
-		selectChannel,
+	// Aligns the text to the center of the grid section
+	newPrimitive := func(text string) tview.Primitive {
+		return tview.NewTextView().
+			SetTextAlign(tview.AlignCenter).
+			SetText(text)
 	}
-
-	// The bottom row has some info on where we are.
-	info := tview.NewTextView().
-		SetDynamicColors(true).
-		SetRegions(true).
-		SetWrap(false)
-
-	// Create the pages for all slides.
-	currentSlide := 0
-	info.Highlight(strconv.Itoa(currentSlide))
-	pages := tview.NewPages()
 	
-	nextSlide := func() {
-		currentSlide = (currentSlide + 1) % len(slides)
-		info.Highlight(strconv.Itoa(currentSlide)).
-			ScrollToHighlight()
-		pages.SwitchToPage(strconv.Itoa(currentSlide))
-	}
-	for index, slide := range slides {
-		title, primitive := slide(nextSlide)
-		pages.AddPage(strconv.Itoa(index), primitive, true, index == currentSlide)
-		fmt.Fprintf(info, `%d ["%d"][darkcyan]%s[white][""]  `, index+1, index, title)
-	}
+	// Formatting for the rendezvous printouts
+	textView := tview.NewTextView().
+		SetTextColor(tcell.ColorGreen).
+		SetScrollable(true).
+		SetDynamicColors(true).
+		SetTextAlign(tview.AlignLeft).
+		SetChangedFunc(func() {
+			app.Draw()
+		})
 
-	// Shortcuts to navigate 
-	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyTAB {
-			nextSlide()
-		} 
-		return event
-	})
+	
+	form := tview.NewForm().
+		AddInputField("> ", "", 100, nil, nil).
+		AddDropDown("Channels", []string{"James", "Bob"}, 0, nil).
+		AddInputField("New Channel", "", 20, nil, nil).
+		AddButton("Connect", func() {
+			go rendezvousChat(textView)
+		}).
+		AddButton("Quit", func() {
+			app.Stop()
+		}).
+		SetHorizontal(true);
+	
+	// Grid container
+	grid := tview.NewGrid().
+		SetRows(3, 0, 3).
+		SetColumns(30, 0, 30).
+		SetBorders(true).
+		AddItem(newPrimitive("Header"), 0, 0, 1, 3, 0, 0, false)
 
+	sideBar := newPrimitive("Messages")	
+		
+	// Layout for screens less than 100 cells.
+	grid.AddItem(textView, 1, 1, 1, 1, 0, 100, false).
+		AddItem(form, 2, 0, 1, 3, 0, 0, true)
 
-	if err := app.SetRoot(pages, true).SetFocus(pages).Run(); err != nil {
+	// Layout for screens wider than 100 cells.
+	grid.AddItem(textView, 1, 2, 1, 1, 0, 100, false).
+		AddItem(sideBar, 1, 0, 1, 2, 0, 100, false).
+		AddItem(form, 2, 0, 1, 3, 0, 100, true)
+	
+
+	if err := app.SetRoot(grid, true).SetFocus(grid).Run(); err != nil {
 		panic(err)
 	}
 }
