@@ -1,5 +1,5 @@
 # MonkSeal Messenger :satellite:
-Encrypted peer to peer messaging application written in Go.
+Peer to peer messaging application written in Go.
 
 If you like it, fork it! Clone it! Help build it! :raised_hands:
 

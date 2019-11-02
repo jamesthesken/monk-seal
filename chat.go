@@ -24,22 +24,36 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	multiaddr "github.com/multiformats/go-multiaddr"
 
+	"github.com/gdamore/tcell"
+
 )
 
 
 func handleStream(stream network.Stream) {
-	fmt.Println("Got a new stream!\n")
+	//fmt.Println("Got a new stream!\n")
 
 	// Create a buffer stream for non blocking read and write.
 	rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
 
-	go readData(rw)
-	go writeData(rw)
+	// Formatting for the rendezvous printouts
+	format := tview.NewTextView().
+		SetTextColor(tcell.ColorYellow).
+		SetScrollable(true).
+		SetDynamicColors(true).
+		SetTextAlign(tview.AlignLeft).
+		SetChangedFunc(func() {
+			app.Draw()
+		})
 
+	go readData(rw, format)
+	go writeData(rw, format)
+
+	// TODO: Is there a way to change this?
 	// 'stream' will stay open until you close it (or the other side closes it).
 }
 
-func readData(rw *bufio.ReadWriter) {
+// Incoming data
+func readData(rw *bufio.ReadWriter, format *tview.TextView) {
 	for {
 		str, err := rw.ReadString('\n')
 		if err != nil {
@@ -58,8 +72,8 @@ func readData(rw *bufio.ReadWriter) {
 
 	}
 }
-
-func writeData(rw *bufio.ReadWriter) {
+// Outgoing data
+func writeData(rw *bufio.ReadWriter, format *tview.TextView) {
 	stdReader := bufio.NewReader(os.Stdin)
 
 	for {
@@ -83,8 +97,10 @@ func writeData(rw *bufio.ReadWriter) {
 	}
 }
 
+
+// Add a second argument which points to the "Message field" to contain the read/write messages
 // Function that bootstraps the network and connects to the desired peer
-func rendezvousChat(format *tview.TextView) {
+func rendezvousChat(format *tview.TextView, format2 *tview.TextView) {
 
 	config, err := ParseFlags()
 	if err != nil {
@@ -175,8 +191,8 @@ func rendezvousChat(format *tview.TextView) {
 		} else {
 			rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
 
-			go writeData(rw)
-			go readData(rw)
+			go writeData(rw, format2)
+			go readData(rw, format2)
 		}
 
 		fmt.Fprintf(format, "Connected to:", peer, "\n")
