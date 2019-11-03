@@ -17,6 +17,18 @@ go build
 `./monk-seal`
 
 
+## Screenshots & Update 11/02/19
+Unfortunately I only have the GUI talking with a client that isn't Monk Seal :( .. So I started up a terminal running a [libp2p example](https://github.com/libp2p/go-libp2p-examples/tree/master/chat-with-rendezvous)
+
+At least it talks over IPFS nodes and can be across networks.
+
+```
+./chat -rendezvous "monkseal"
+
+```
+
+![screenshot](update.png)
+
 ## What's with the name?
 Monk seals are common in the Hawaiian Islands. Although they look soft, they won't hesitate to bark in your face if they get the chance. 
 

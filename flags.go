@@ -48,7 +48,7 @@ type Config struct {
 
 func ParseFlags() (Config, error) {
 	config := Config{}
-	flag.StringVar(&config.RendezvousString, "rendezvous", "meet me here",
+	flag.StringVar(&config.RendezvousString, "rendezvous", "monkseal",
 		"Unique string to identify group of nodes. Share this with your friends to let them connect with you")
 	flag.Var(&config.BootstrapPeers, "peer", "Adds a peer multiaddress to the bootstrap list")
 	flag.Var(&config.ListenAddresses, "listen", "Adds a multiaddress to the listen list")

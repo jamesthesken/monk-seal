@@ -11,7 +11,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"os"
+
 	"sync"
 
 	"github.com/rivo/tview"
@@ -45,8 +45,14 @@ func handleStream(stream network.Stream) {
 			app.Draw()
 		})
 
+	myMessage := tview.NewInputField().
+				SetLabel("> ").
+				SetFieldWidth(100)
+
 	go readData(rw, format)
-	go writeData(rw, format)
+	go writeData(rw, format, myMessage)
+
+	//fmt.Fprintf(format, "Got a new stream!")
 
 	// TODO: Is there a way to change this?
 	// 'stream' will stay open until you close it (or the other side closes it).
@@ -57,7 +63,7 @@ func readData(rw *bufio.ReadWriter, format *tview.TextView) {
 	for {
 		str, err := rw.ReadString('\n')
 		if err != nil {
-			fmt.Println("Error reading from buffer")
+			fmt.Fprintf(format, "Error reading from buffer")
 			panic(err)
 		}
 
@@ -67,18 +73,38 @@ func readData(rw *bufio.ReadWriter, format *tview.TextView) {
 		if str != "\n" {
 			// Green console colour: 	\x1b[32m
 			// Reset console colour: 	\x1b[0m
-			fmt.Printf("\x1b[32m%s\x1b[0m> ", str)
+			//fmt.Printf("\x1b[32m%s\x1b[0m> ", str)
+			fmt.Fprintf(format, str)
 		}
 
 	}
 }
 // Outgoing data
-func writeData(rw *bufio.ReadWriter, format *tview.TextView) {
-	stdReader := bufio.NewReader(os.Stdin)
+func writeData(rw *bufio.ReadWriter, format *tview.TextView, myMessage *tview.InputField) {
+	//stdReader := bufio.NewReader(os.Stdin)
 
+	// When user presses enter, the text clears and prints properly
+	myMessage.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+			k := event.Key()
+			myMsg := myMessage.GetText()
+			if k == tcell.KeyEnter {
+				fmt.Fprintf(format,"(You) > 	")
+				fmt.Fprintf(format, myMsg)
+				fmt.Fprintf(format,"\n")
+				rw.WriteString(fmt.Sprintf("%s\n", myMsg))
+				//rw.Flush()
+				myMessage.SetText("")
+			}
+			return event
+		})
+
+	// Need to have the entered string as sendData
+/*
 	for {
-		fmt.Print("> ")
+		//fmt.Fprintf(format, "> ")
 		sendData, err := stdReader.ReadString('\n')
+
+
 		if err != nil {
 			fmt.Println("Error reading from stdin")
 			panic(err)
@@ -95,19 +121,22 @@ func writeData(rw *bufio.ReadWriter, format *tview.TextView) {
 			panic(err)
 		}
 	}
+*/
+
 }
 
 
 // Add a second argument which points to the "Message field" to contain the read/write messages
 // Function that bootstraps the network and connects to the desired peer
-func rendezvousChat(format *tview.TextView, format2 *tview.TextView) {
+func rendezvousChat(format *tview.TextView, format2 *tview.TextView, myMessage *tview.InputField) {
 
 	config, err := ParseFlags()
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Fprintf(format, "Starting MonkSeal chat \n")
+	fmt.Fprintf(format, "Starting MonkSeal chat")
+	fmt.Fprintf(format, "\n")
 
 
 	ctx := context.Background()
@@ -120,7 +149,8 @@ func rendezvousChat(format *tview.TextView, format2 *tview.TextView) {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Fprintf(format, "Host created. We are:", host.ID() + "\n")
+	fmt.Fprintf(format, "Host created. We are:", host.ID())
+	fmt.Fprintf(format, "\n")
 	//fmt.Fprintf(format, host.Addrs())
 
 	// Set a function as stream handler. This function is called when a peer
@@ -138,7 +168,8 @@ func rendezvousChat(format *tview.TextView, format2 *tview.TextView) {
 
 	// Bootstrap the DHT. In the default configuration, this spawns a Background
 	// thread that will refresh the peer table every five minutes.
-	fmt.Fprintf(format, "Bootstrapping the DHT\n")
+	fmt.Fprintf(format, "Bootstrapping the DHT")
+	fmt.Fprintf(format, "\n")
 	if err = kademliaDHT.Bootstrap(ctx); err != nil {
 		panic(err)
 	}
@@ -153,9 +184,11 @@ func rendezvousChat(format *tview.TextView, format2 *tview.TextView) {
 			defer wg.Done()
 			if err := host.Connect(ctx, *peerinfo); err != nil {
 				//logger.Warning(err)
-				fmt.Fprintf(format, "Warning: ", err, "\n")
+				fmt.Fprintf(format, "Warning: ", err)
+				fmt.Fprintf(format, "\n")
 			} else {
-				fmt.Fprintf(format, "Connection established with bootstrap node:", *peerinfo, "\n")
+				fmt.Fprintf(format, "Connection established with bootstrap node:", *peerinfo)
+				fmt.Fprintf(format, "\n")
 			}
 		}()
 	}
@@ -163,14 +196,17 @@ func rendezvousChat(format *tview.TextView, format2 *tview.TextView) {
 
 	// We use a rendezvous point "meet me here" to announce our location.
 	// This is like telling your friends to meet you at the Eiffel Tower.
-	fmt.Fprintf(format, "Announcing ourselves...\n")
+	fmt.Fprintf(format, "Announcing ourselves...")
+	fmt.Fprintf(format, "\n")
 	routingDiscovery := discovery.NewRoutingDiscovery(kademliaDHT)
 	discovery.Advertise(ctx, routingDiscovery, config.RendezvousString)
-	fmt.Fprintf(format, "Successfully announced!\n")
+	fmt.Fprintf(format, "Successfully announced!")
+	fmt.Fprintf(format, "\n")
 
 	// Now, look for others who have announced
 	// This is like your friend telling you the location to meet you.
-	fmt.Fprintf(format, "Searching for other peers...\n")
+	fmt.Fprintf(format, "Searching for other peers...")
+	fmt.Fprintf(format, "\n")
 	peerChan, err := routingDiscovery.FindPeers(ctx, config.RendezvousString)
 	if err != nil {
 		panic(err)
@@ -180,22 +216,26 @@ func rendezvousChat(format *tview.TextView, format2 *tview.TextView) {
 		if peer.ID == host.ID() {
 			continue
 		}
-		fmt.Fprintf(format, "Found peer:", peer, "\n")
+		fmt.Fprintf(format, "Found peer:", peer)
+		fmt.Fprintf(format, "\n")
 
-		fmt.Fprintf(format, "Connecting to:", peer, "\n")
+		fmt.Fprintf(format, "Connecting to:", peer)
+		fmt.Fprintf(format, "\n")
 		stream, err := host.NewStream(ctx, peer.ID, protocol.ID(config.ProtocolID))
 
 		if err != nil {
-			fmt.Fprintf(format, "Connection failed:", err, "\n")
+			fmt.Fprintf(format, "Connection failed:", err)
+			fmt.Fprintf(format, "\n")
 			continue
 		} else {
 			rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
 
-			go writeData(rw, format2)
+			go writeData(rw, format2, myMessage)
 			go readData(rw, format2)
 		}
 
-		fmt.Fprintf(format, "Connected to:", peer, "\n")
+		fmt.Fprintf(format, "Connected to:", peer)
+		fmt.Fprintf(format, "\n")
 	}
 
 	select {}
