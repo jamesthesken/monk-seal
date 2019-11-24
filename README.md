@@ -27,7 +27,7 @@ At least it talks over IPFS nodes and can be across networks.
 
 ```
 
-![screenshot](update.png)
+![screenshot](tui.png)
 
 ## What's with the name?
 Monk seals are common in the Hawaiian Islands. Although they look soft, they won't hesitate to bark in your face if they get the chance. 
